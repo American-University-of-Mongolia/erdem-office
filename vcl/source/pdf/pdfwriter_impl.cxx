@@ -1638,6 +1638,71 @@ bool PDFWriterImpl::emitType3Font(const vcl::font::PhysicalFontFace* pFace,
         ResourceDict aResourceDict;
         std::list<StreamRedirect> aOutputStreams;
 
+        // First pass: create Form XObjects for COLRv1 glyphs.
+        // Must be done before writing CharProcs to avoid interleaving
+        // PDF objects (which would corrupt the xref table).
+        std::map<sal_uInt32, sal_Int32> aColorPaintFormObjects;
+        for (auto i = 1u; i < nGlyphs; i++)
+        {
+            const auto& rGlyph = rSubset.m_aMapping.find(pGlyphIds[i])->second;
+            const auto& pPaint = rGlyph.getColorPaint();
+            if (!pPaint)
+                continue;
+
+            auto* pPage = pPaint->GetPages()[0];
+
+            double aBBox[4] = { 0, 0, 0, 0 };
+            if (auto* pMediaBox = dynamic_cast<filter::PDFArrayElement*>(
+                    pPage->Lookup("MediaBox"_ostr)))
+            {
+                const auto& rElems = pMediaBox->GetElements();
+                for (size_t bi = 0; bi < 4 && bi < rElems.size(); ++bi)
+                    if (auto* pNum = dynamic_cast<filter::PDFNumberElement*>(rElems[bi]))
+                        aBBox[bi] = pNum->GetValue();
+            }
+
+            // Copy resources and content stream into a Form XObject.
+            sal_Int32 nFormObject = createObject();
+            OStringBuffer aFormLine;
+            aFormLine.append(OString::number(nFormObject)
+                + " 0 obj\n<< /Type /XObject /Subtype /Form");
+
+            std::map<sal_Int32, sal_Int32> aCopiedResources;
+            PDFObjectCopier aCopier(*this);
+            aCopier.copyPageResources(pPage, aFormLine, aCopiedResources);
+
+            aFormLine.append(" /BBox ["
+                + OString::number(aBBox[0]) + " "
+                + OString::number(aBBox[1]) + " "
+                + OString::number(aBBox[2]) + " "
+                + OString::number(aBBox[3]) + "]");
+
+            std::vector<filter::PDFObjectElement*> aContentStreams;
+            if (auto* pCS = pPage->LookupObject("Contents"_ostr))
+                aContentStreams.push_back(pCS);
+            SvMemoryStream aContentStream;
+            bool bCompressed = false;
+            sal_Int32 nLen = PDFObjectCopier::copyPageStreams(
+                aContentStreams, aContentStream, bCompressed, false);
+
+            if (bCompressed)
+                aFormLine.append(" /Filter /FlateDecode");
+            aFormLine.append(" /Length " + OString::number(nLen) + " >>\nstream\n");
+            if (updateObject(nFormObject) && writeBuffer(aFormLine))
+            {
+                checkAndEnableStreamEncryption(nFormObject);
+                writeBufferBytes(static_cast<const char*>(aContentStream.GetData()),
+                                 aContentStream.Tell());
+                disableStreamEncryption();
+                writeBuffer("endstream\nendobj\n\n"_ostr);
+
+                OString aXObjName = "Fm" + OString::number(nFormObject);
+                pushResource(ResourceKind::XObject, aXObjName,
+                             nFormObject, aResourceDict, aOutputStreams);
+                aColorPaintFormObjects[i] = nFormObject;
+            }
+        }
+
         for (auto i = 1u; i < nGlyphs; i++)
         {
             auto nStream = pGlyphStreams[i];
@@ -1712,6 +1777,19 @@ bool PDFWriterImpl::emitType3Font(const vcl::font::PhysicalFontFace* pFace,
                 aContents.append(" ");
                 appendDouble(aRect.getY() * fScale, aContents);
                 aContents.append(" cm /Im" + OString::number(nObject) + " Do Q\n");
+            }
+
+            if (auto it = aColorPaintFormObjects.find(i);
+                it != aColorPaintFormObjects.end())
+            {
+                OString aXObjName = "Fm" + OString::number(it->second);
+                aContents.append("q ");
+                appendDouble(fScale, aContents);
+                aContents.append(" 0 0 ");
+                appendDouble(fScale, aContents);
+                aContents.append(" 0 0 cm\n/");
+                aContents.append(aXObjName);
+                aContents.append(" Do\nQ\n");
             }
 
             // The newline before `endstream` is not counted as within the stream
@@ -5617,6 +5695,29 @@ Bitmap decodeColorBitmap(const vcl::font::PhysicalFontFace* pFace, sal_GlyphId n
 
     return aBitmap;
 }
+
+// Render the COLRv1 paint of a glyph to a PDF document, or nullptr if it has none
+// or it can't be rendered, in which case the glyph is drawn as a non-color one.
+std::unique_ptr<filter::PDFDocument> renderColorPaint(const vcl::font::PhysicalFontFace* pFace,
+                                                      sal_GlyphId nGlyphId)
+{
+    auto aData = pFace->RenderGlyphColorPaintPdf(nGlyphId);
+    if (aData.empty())
+    {
+        SAL_WARN("vcl.pdfwriter", "Failed to render the COLRv1 paint of glyph " << nGlyphId);
+        return nullptr;
+    }
+
+    SvMemoryStream aStream(const_cast<uint8_t*>(aData.data()), aData.size(), StreamMode::READ);
+    auto pDocument = std::make_unique<filter::PDFDocument>();
+    if (!pDocument->ReadWithPossibleFixup(aStream) || pDocument->GetPages().empty())
+    {
+        SAL_WARN("vcl.pdfwriter", "Failed to parse the COLRv1 paint of glyph " << nGlyphId);
+        return nullptr;
+    }
+
+    return pDocument;
+}
 }
 
 void PDFWriterImpl::registerGlyph(const sal_GlyphId nFontGlyphId,
@@ -5639,11 +5740,16 @@ void PDFWriterImpl::registerGlyph(const sal_GlyphId nFontGlyphId,
         tools::Rectangle aRect;
         std::vector<vcl::font::ColorLayer> aLayers;
         Bitmap aBitmap;
-        // A glyph whose bitmap can't be decoded is left to the non-color path below.
-        aLayers = pFace->GetGlyphColorLayers(nFontGlyphId);
+        // A COLRv1 paint takes precedence over COLRv0 layers, over bitmaps. Anything
+        // that can't be rendered is left to the non-color glyph path below.
+        std::unique_ptr<filter::PDFDocument> pPaint;
+        if (pFace->HasGlyphColorPaint(nFontGlyphId))
+            pPaint = renderColorPaint(pFace, nFontGlyphId);
+        if (!pPaint)
+            aLayers = pFace->GetGlyphColorLayers(nFontGlyphId);
         if (aLayers.empty())
             aBitmap = decodeColorBitmap(pFace, nFontGlyphId, aRect);
-        if (!aLayers.empty() || !aBitmap.IsEmpty())
+        if (!aLayers.empty() || !aBitmap.IsEmpty() || pPaint)
         {
             // create new subset if necessary
             if (rSubset.m_aSubsets.empty()
@@ -5682,6 +5788,8 @@ void PDFWriterImpl::registerGlyph(const sal_GlyphId nFontGlyphId,
             }
             else if (!aBitmap.IsEmpty())
                 rNewGlyphEmit.setColorBitmap(std::move(aBitmap), aRect);
+            else if (pPaint)
+                rNewGlyphEmit.setColorPaint(std::move(pPaint));
 
             // add new glyph to font mapping
             Glyph& rNewGlyph = rSubset.m_aMapping[nFontGlyphId];
