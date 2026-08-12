@@ -346,6 +346,7 @@ enum class SfxItemType : sal_uInt16
     SvxFontItemType,
     SvxFontListItemType,
     SvxFontVariationsItemType,
+    SvxFontFeaturesItemType,
     SvxForbiddenRuleItemType,
     SvxFormatBreakItemType,
     SvxFormatKeepItemType,
