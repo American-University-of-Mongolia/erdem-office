@@ -33,6 +33,25 @@ If requirements are ambiguous, state the ambiguity and ask before making a
 choice that would affect document compatibility, legal compliance, linguistic
 correctness, or the long-term maintenance of the fork.
 
+## Development Workflow
+
+- Never commit directly to `master`. Every change, including documentation and
+  configuration changes, must be developed on a focused branch based on the
+  current `origin/master`.
+- Use one branch and pull request per issue or coherent change. Do not combine
+  unrelated work.
+- Prefer a separate Git worktree for agent work. A separate worktree is required
+  when the primary checkout is dirty, another task is in progress, or multiple
+  changes are being developed concurrently. Do not modify another task's
+  worktree or uncommitted files.
+- Before editing, verify the current branch, worktree status, and intended base.
+- Run the relevant checks, push the feature branch, and open a pull request that
+  links the issue when one exists and records the verification performed.
+- Merge changes through the pull request only after required checks and reviews
+  pass. Do not merge locally and push directly to `master`.
+- Do not force-push shared branches or merge a pull request with unresolved
+  compatibility, licensing, or specialist-review requirements.
+
 ## Working Principles
 
 - Keep the Erdem Office patch set small and easy to rebase onto LibreOffice.
@@ -79,4 +98,3 @@ Report:
 
 Do not describe work as complete when required specialist review or document
 compatibility testing is still pending.
-
