@@ -985,6 +985,12 @@ void SfxApplication::MiscExec_Impl( SfxRequest& rReq )
             }
 
             OUString aNewName(pModeName->GetValue());
+            if (aNewName != u"notebookbar.ui"_ustr)
+            {
+                bDone = true;
+                break;
+            }
+
             const uno::Reference< uno::XComponentContext >& xContext =
                     ::comphelper::getProcessComponentContext();
 
@@ -1216,10 +1222,6 @@ void SfxApplication::MiscExec_Impl( SfxRequest& rReq )
         }
         case SID_UI_PICKER:
         {
-            SfxAbstractDialogFactory* pFact = SfxAbstractDialogFactory::Create();
-            ScopedVclPtr<VclAbstractDialog> pDlg(
-                pFact->CreateUIPickerDialog(rReq.GetFrameWeld()));
-            pDlg->Execute();
             bDone = true;
             break;
         }
