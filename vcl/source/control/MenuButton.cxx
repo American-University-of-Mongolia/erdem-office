@@ -23,6 +23,7 @@
 #include <vcl/menu.hxx>
 #include <vcl/timer.hxx>
 #include <vcl/toolkit/MenuButton.hxx>
+#include <vcl/vclevent.hxx>
 #include <vcl/settings.hxx>
 #include <vcl/uitest/uiobject.hxx>
 #include <vcl/uitest/logger.hxx>
@@ -72,10 +73,14 @@ void MenuButton::ExecuteMenu()
     {
         Point aPos(0, 1);
         tools::Rectangle aRect(aPos, aSize );
+        CallEventListeners(VclEventId::DropdownOpen);
         mpMenu->Execute(this, aRect, PopupMenuFlags::ExecuteDown);
 
         if (isDisposed())
             return;
+
+        mbStartingMenu = false;
+        CallEventListeners(VclEventId::DropdownClose);
 
         mnCurItemId = mpMenu->GetCurItemId();
         msCurItemIdent = mpMenu->GetCurItemIdent();
@@ -84,7 +89,8 @@ void MenuButton::ExecuteMenu()
     {
         Point aPos(GetParent()->OutputToScreenPixel(GetPosPixel()));
         tools::Rectangle aRect(aPos, aSize );
-        FloatWinPopupFlags nFlags = FloatWinPopupFlags::Down | FloatWinPopupFlags::GrabFocus;
+        FloatWinPopupFlags nFlags = FloatWinPopupFlags::Down | FloatWinPopupFlags::GrabFocus
+                                    | FloatWinPopupFlags::AllMouseButtonClose;
         if (mpFloatingWindow->GetType() == WindowType::FLOATINGWINDOW)
             static_cast<FloatingWindow*>(mpFloatingWindow.get())->StartPopupMode(aRect, nFlags);
         else
@@ -92,6 +98,7 @@ void MenuButton::ExecuteMenu()
             mpFloatingWindow->EnableDocking();
             vcl::Window::GetDockingManager()->StartPopupMode(mpFloatingWindow, aRect, nFlags);
         }
+        CallEventListeners(VclEventId::DropdownOpen);
     }
 
     Activate();
@@ -163,6 +170,13 @@ MenuButton::~MenuButton()
 
 void MenuButton::dispose()
 {
+    if (mpFloatingWindow)
+    {
+        if (mpFloatingWindow->GetType() == WindowType::FLOATINGWINDOW)
+            static_cast<FloatingWindow*>(mpFloatingWindow.get())->SetPopupModeEndHdl({});
+        else
+            vcl::Window::GetDockingManager()->SetPopupModeEndHdl(mpFloatingWindow, {});
+    }
     mpFloatingWindow.reset();
     if (mpMenu && mbOwnPopupMenu)
         mpMenu->dispose();
@@ -223,7 +237,32 @@ void MenuButton::SetPopover(Window* pWindow)
     if (pWindow == mpFloatingWindow)
         return;
 
+    if (mpFloatingWindow)
+    {
+        if (mpFloatingWindow->GetType() == WindowType::FLOATINGWINDOW)
+            static_cast<FloatingWindow*>(mpFloatingWindow.get())->SetPopupModeEndHdl({});
+        else
+            vcl::Window::GetDockingManager()->SetPopupModeEndHdl(mpFloatingWindow, {});
+    }
+
     mpFloatingWindow = pWindow;
+
+    if (mpFloatingWindow)
+    {
+        if (mpFloatingWindow->GetType() == WindowType::FLOATINGWINDOW)
+            static_cast<FloatingWindow*>(mpFloatingWindow.get())
+                ->SetPopupModeEndHdl(LINK(this, MenuButton, PopupModeEndHdl));
+        else
+            vcl::Window::GetDockingManager()->SetPopupModeEndHdl(
+                mpFloatingWindow, LINK(this, MenuButton, PopupModeEndHdl));
+    }
+}
+
+IMPL_LINK_NOARG(MenuButton, PopupModeEndHdl, FloatingWindow*, void)
+{
+    VclPtr<MenuButton> xThis(this);
+    if (!xThis->isDisposed())
+        CallEventListeners(VclEventId::DropdownClose);
 }
 
 
