@@ -10,13 +10,9 @@
 #include <welcomedlg.hxx>
 
 #include <whatsnewtabpage.hxx>
-#include <uitabpage.hxx>
 #include "../options/appearance.hxx"
 
-#include <comphelper/dispatchcommand.hxx>
-#include <officecfg/Office/UI/ToolbarMode.hxx>
 #include <officecfg/Setup.hxx>
-#include <unotools/confignode.hxx>
 #include <vcl/weld/Builder.hxx>
 #include <vcl/weld/Notebook.hxx>
 
@@ -31,7 +27,6 @@
 #include <com/sun/star/frame/XModel3.hpp>
 
 constexpr OUString sNewsTab = u"WhatsNewTabPage"_ustr;
-constexpr OUString sUITab = u"UITabPage"_ustr;
 constexpr OUString sAppearanceTab = u"AppearanceTabPage"_ustr;
 
 WelcomeDialog::WelcomeDialog(weld::Window* pParent, const bool bIsFirstStart)
@@ -47,7 +42,6 @@ WelcomeDialog::WelcomeDialog(weld::Window* pParent, const bool bIsFirstStart)
     m_xDialog->set_title(SfxResId(STR_WELCOME_LINE1));
 
     AddTabPage(sNewsTab, WhatsNewTabPage::Create, nullptr);
-    AddTabPage(sUITab, UITabPage::Create, nullptr);
     AddTabPage(sAppearanceTab, SvxAppearanceTabPage::Create, nullptr);
 
     m_xTabCtrl->connect_enter_page(LINK(this, WelcomeDialog, OnActivatePage));
@@ -107,7 +101,7 @@ IMPL_LINK_NOARG(WelcomeDialog, OnNextClick, weld::Button&, void)
 {
     const int nCurrentTabPage(m_xTabCtrl->get_current_page());
 
-    if (nCurrentTabPage < 2)
+    if (nCurrentTabPage < 1)
     {
         m_xTabCtrl->set_current_page(nCurrentTabPage + 1);
         OnActivatePage(m_xTabCtrl->get_page_ident(nCurrentTabPage + 1));
@@ -129,39 +123,6 @@ IMPL_LINK_NOARG(WelcomeDialog, OnActionClick, weld::Button&, void)
         }
         break;
         case 1:
-        {
-            UITabPage* pUITabPage = static_cast<UITabPage*>(GetCurTabPage());
-            OUString sCmd = pUITabPage->GetSelectedMode();
-
-            std::shared_ptr<comphelper::ConfigurationChanges> aBatch(
-                comphelper::ConfigurationChanges::create());
-            officecfg::Office::UI::ToolbarMode::ActiveWriter::set(sCmd, aBatch);
-            officecfg::Office::UI::ToolbarMode::ActiveCalc::set(sCmd, aBatch);
-            officecfg::Office::UI::ToolbarMode::ActiveImpress::set(sCmd, aBatch);
-            officecfg::Office::UI::ToolbarMode::ActiveDraw::set(sCmd, aBatch);
-            aBatch->commit();
-
-            const OUString sCurrentApp = UITabPage::GetCurrentApp();
-            if (SfxViewFrame::Current())
-            {
-                const auto& xContext = comphelper::getProcessComponentContext();
-                const utl::OConfigurationTreeRoot aAppNode(
-                    xContext, u"org.openoffice.Office.UI.ToolbarMode/Applications/"_ustr, true);
-                if (sCurrentApp != "Writer")
-                    aAppNode.setNodeValue(u"Writer/Active"_ustr, css::uno::Any(sCmd));
-                if (sCurrentApp != "Calc")
-                    aAppNode.setNodeValue(u"Calc/Active"_ustr, css::uno::Any(sCmd));
-                if (sCurrentApp != "Impress")
-                    aAppNode.setNodeValue(u"Impress/Active"_ustr, css::uno::Any(sCmd));
-                if (sCurrentApp != "Draw")
-                    aAppNode.setNodeValue(u"Draw/Active"_ustr, css::uno::Any(sCmd));
-                aAppNode.commit();
-            };
-
-            comphelper::dispatchCommand(".uno:ToolbarMode?Mode:string=" + sCmd, {});
-        }
-        break;
-        case 2:
         {
             SvxAppearanceTabPage* pAppearanceTabPage
                 = static_cast<SvxAppearanceTabPage*>(GetCurTabPage());

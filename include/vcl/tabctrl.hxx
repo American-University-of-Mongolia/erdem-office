@@ -80,6 +80,7 @@ protected:
     virtual const vcl::Font&    GetCanonicalFont( const StyleSettings& _rStyle ) const override;
     virtual const Color&        GetCanonicalTextColor( const StyleSettings& _rStyle ) const override;
     virtual bool                ImplPlaceTabs( tools::Long nWidth );
+    virtual bool                UseNativeTabItemRendering() const { return true; }
     SAL_DLLPRIVATE Size ImplCalculateRequisition(sal_uInt16& nHeaderHeight) const;
 
 public:
@@ -192,6 +193,7 @@ public:
 protected:
     virtual bool ImplPlaceTabs( tools::Long nWidth ) override;
     virtual void ImplActivateTabPage( bool bNext ) override;
+    bool UseNativeTabItemRendering() const override { return false; }
 
 private:
     bool bLastContextWasSupported;

@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE oor:component-data SYSTEM "../../../../../component-update.dtd">
 <oor:component-data xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:install="http://openoffice.org/2004/installation" oor:name="ToolbarMode" oor:package="org.openoffice.Office.UI">
-  <prop oor:name="ActiveWriter">
+  <prop oor:name="ActiveWriter" oor:finalized="true">
     <value>notebookbar.ui</value>
   </prop>
-  <prop oor:name="ActiveCalc">
+  <prop oor:name="ActiveCalc" oor:finalized="true">
     <value>notebookbar.ui</value>
   </prop>
-  <prop oor:name="ActiveImpress">
+  <prop oor:name="ActiveImpress" oor:finalized="true">
     <value>notebookbar.ui</value>
   </prop>
-  <prop oor:name="ActiveDraw">
+  <prop oor:name="ActiveDraw" oor:finalized="true">
     <value>notebookbar.ui</value>
   </prop>
   <node oor:name="Applications">
     <node oor:name="Writer" oor:op="replace">
-      <prop oor:name="Active">
-        <value>Default</value>
+      <prop oor:name="Active" oor:finalized="true">
+        <value>notebookbar.ui</value>
       </prop>
       <node oor:name="Modes">
         <node oor:name="Default" oor:op="replace">
@@ -295,8 +295,8 @@
       </node>
     </node>
     <node oor:name="Calc" oor:op="replace">
-      <prop oor:name="Active">
-        <value>Default</value>
+      <prop oor:name="Active" oor:finalized="true">
+        <value>notebookbar.ui</value>
       </prop>
       <node oor:name="Modes">
         <node oor:name="Default" oor:op="replace">
@@ -544,8 +544,8 @@
       </node>
     </node>
     <node oor:name="Impress" oor:op="replace">
-      <prop oor:name="Active">
-        <value>Default</value>
+      <prop oor:name="Active" oor:finalized="true">
+        <value>notebookbar.ui</value>
       </prop>
       <node oor:name="Modes">
         <node oor:name="Default" oor:op="replace">
@@ -799,8 +799,8 @@
       </node>
     </node>
     <node oor:name="Draw" oor:op="replace">
-      <prop oor:name="Active">
-        <value>Default</value>
+      <prop oor:name="Active" oor:finalized="true">
+        <value>notebookbar.ui</value>
       </prop>
       <node oor:name="Modes">
         <node oor:name="Default" oor:op="replace">
