@@ -30,6 +30,7 @@
 
 class Timer;
 class PopupMenu;
+class FloatingWindow;
 
 class UNLESS_MERGELIBS(VCL_DLLPUBLIC) MenuButton : public PushButton
 {
@@ -45,6 +46,8 @@ private:
     bool            mbStartingMenu;
     Link<MenuButton*,void> maActivateHdl;
     Link<MenuButton*,void> maSelectHdl;
+
+    DECL_LINK(PopupModeEndHdl, FloatingWindow*, void);
 
                            MenuButton( const MenuButton & ) = delete;
                            MenuButton& operator=( const MenuButton & ) = delete;

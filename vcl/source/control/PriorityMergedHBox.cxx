@@ -17,16 +17,41 @@
 *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
 */
 
-#include <vcl/toolkit/button.hxx>
+#include <vcl/toolkit/MenuButton.hxx>
 #include <vcl/layout.hxx>
 #include <bitmaps.hlst>
 #include <NotebookbarPopup.hxx>
 #include <PriorityHBox.hxx>
 #include <PriorityMergedHBox.hxx>
 #include <comphelper/lok.hxx>
+#include <svdata.hxx>
+#include <strings.hrc>
 
 #define DUMMY_WIDTH 50
 #define BUTTON_WIDTH 30
+
+namespace
+{
+class NotebookbarMenuButton final : public MenuButton
+{
+private:
+    Link<MenuButton*, void> m_aPrepareHdl;
+
+protected:
+    virtual void PrepareExecute() override
+    {
+        m_aPrepareHdl.Call(this);
+    }
+
+public:
+    NotebookbarMenuButton(vcl::Window* pParent, const Link<MenuButton*, void>& rPrepareHdl)
+        : MenuButton(pParent, WB_FLATBUTTON)
+        , m_aPrepareHdl(rPrepareHdl)
+    {
+    }
+
+};
+}
 
 /*
 * PriorityMergedHBox is a VclHBox which hides its own children if there is no sufficient space.
@@ -35,9 +60,12 @@
 PriorityMergedHBox::PriorityMergedHBox(vcl::Window* pParent)
     : PriorityHBox(pParent)
 {
-    m_pButton = VclPtr<PushButton>::Create(this, WB_FLATBUTTON);
-    m_pButton->SetClickHdl(LINK(this, PriorityMergedHBox, PBClickHdl));
+    m_pButton = VclPtr<NotebookbarMenuButton>::Create(
+        this, LINK(this, PriorityMergedHBox, PopupPrepareHdl));
     m_pButton->SetModeImage(Image(StockImage::Yes, CHEVRON));
+    m_pButton->SetDropDown(PushButtonDropdownStyle::NONE);
+    m_pButton->SetQuickHelpText(VclResId(SV_HELPTEXT_MORE_COMMANDS));
+    m_pButton->SetAccessibleName(VclResId(SV_HELPTEXT_MORE_COMMANDS));
     m_pButton->set_width_request(25);
     m_pButton->set_pack_type(VclPackType::End);
     m_pButton->Show();
@@ -162,12 +190,13 @@ Size PriorityMergedHBox::calculateRequisition() const
     return finalizeMaxes(aSize, nVisibleChildren);
 }
 
-IMPL_LINK(PriorityMergedHBox, PBClickHdl, Button*, /*pButton*/, void)
+IMPL_LINK_NOARG(PriorityMergedHBox, PopupPrepareHdl, MenuButton*, void)
 {
     if (m_pPopup)
         m_pPopup.disposeAndClear();
 
     m_pPopup = VclPtr<NotebookbarPopup>::Create(this);
+    m_pButton->SetPopover(m_pPopup);
 
     for (int i = 0; i < GetChildCount(); i++)
     {
@@ -185,13 +214,6 @@ IMPL_LINK(PriorityMergedHBox, PBClickHdl, Button*, /*pButton*/, void)
     }
 
     m_pPopup->hideSeparators(true);
-
-    tools::Long x = m_pButton->GetPosPixel().getX();
-    tools::Long y = m_pButton->GetPosPixel().getY() + GetSizePixel().Height();
-    tools::Rectangle aRect(x, y, x, y);
-
-    m_pPopup->StartPopupMode(aRect, FloatWinPopupFlags::Down | FloatWinPopupFlags::GrabFocus
-                                        | FloatWinPopupFlags::AllMouseButtonClose);
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

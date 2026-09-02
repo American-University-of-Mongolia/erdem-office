@@ -32,8 +32,11 @@
 #include <test/a11y/XAccessibleContextTester.hxx>
 #include <test/a11y/XAccessibleEventBroadcasterTester.hxx>
 #include <test/a11y/XAccessibleExtendedComponentTester.hxx>
+#include <vcl/scheduler.hxx>
 #include <vcl/toolkit/dialog.hxx>
+#include <vcl/toolkit/floatwin.hxx>
 #include <vcl/toolkit/lstbox.hxx>
+#include <vcl/toolkit/MenuButton.hxx>
 
 CPPUNIT_TEST_FIXTURE(test::AccessibleTestBase, AccessibleDropDownListBox)
 {
@@ -72,6 +75,42 @@ CPPUNIT_TEST_FIXTURE(test::AccessibleTestBase, AccessibleDropDownListBox)
 
     WindowXAccessibleEventBroadcasterTester aEventBroadcasterTester(pListBoxAcc, pListBox);
     aEventBroadcasterTester.testAll();
+}
+
+CPPUNIT_TEST_FIXTURE(test::AccessibleTestBase, AccessibleMenuButton)
+{
+    ScopedVclPtr<::Dialog> pDialog = VclPtr<::Dialog>::Create(nullptr, WB_MOVEABLE | WB_CLOSEABLE,
+                                                              ::Dialog::InitFlag::NoParent);
+    VclPtr<MenuButton> pButton = VclPtr<MenuButton>::Create(pDialog, WB_FLATBUTTON);
+    VclPtr<FloatingWindow> pPopup = VclPtr<FloatingWindow>::Create(pDialog, WB_MOVEABLE);
+    pButton->SetAccessibleName(u"More commands"_ustr);
+    pButton->SetPopover(pPopup);
+    pButton->SetSizePixel(Size(30, 30));
+    pButton->Show();
+    pDialog->Show();
+
+    rtl::Reference<comphelper::OAccessible> pButtonAcc = pButton->GetAccessible();
+    CPPUNIT_ASSERT_EQUAL(css::accessibility::AccessibleRole::BUTTON_MENU,
+                         pButtonAcc->getAccessibleRole());
+    CPPUNIT_ASSERT_EQUAL(u"More commands"_ustr, pButtonAcc->getAccessibleName());
+
+    sal_Int64 nStateSet = pButtonAcc->getAccessibleStateSet();
+    CPPUNIT_ASSERT(nStateSet & css::accessibility::AccessibleStateType::EXPANDABLE);
+    CPPUNIT_ASSERT(!(nStateSet & css::accessibility::AccessibleStateType::EXPANDED));
+
+    css::uno::Reference<css::accessibility::XAccessibleAction> xAction(
+        pButtonAcc->getXWeak(), css::uno::UNO_QUERY_THROW);
+    CPPUNIT_ASSERT(xAction->doAccessibleAction(0));
+    CPPUNIT_ASSERT(pButton->InPopupMode());
+
+    nStateSet = pButtonAcc->getAccessibleStateSet();
+    CPPUNIT_ASSERT(nStateSet & css::accessibility::AccessibleStateType::EXPANDED);
+
+    pButton->CancelMenu();
+    Scheduler::ProcessEventsToIdle();
+    CPPUNIT_ASSERT(!pButton->InPopupMode());
+    nStateSet = pButtonAcc->getAccessibleStateSet();
+    CPPUNIT_ASSERT(!(nStateSet & css::accessibility::AccessibleStateType::EXPANDED));
 }
 
 CPPUNIT_PLUGIN_IMPLEMENT();

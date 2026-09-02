@@ -30,6 +30,7 @@
 
 #include <vcl/accessibility/strings.hxx>
 #include <vcl/toolkit/button.hxx>
+#include <vcl/toolkit/MenuButton.hxx>
 #include <vcl/event.hxx>
 #include <vcl/vclevent.hxx>
 
@@ -61,6 +62,20 @@ void VCLXAccessibleButton::ProcessWindowEvent( const VclWindowEvent& rVclWindowE
             NotifyAccessibleEvent( AccessibleEventId::STATE_CHANGED, aOldValue, aNewValue );
         }
         break;
+        case VclEventId::DropdownOpen:
+        {
+            Any aNewValue;
+            aNewValue <<= AccessibleStateType::EXPANDED;
+            NotifyAccessibleEvent(AccessibleEventId::STATE_CHANGED, Any(), aNewValue);
+        }
+        break;
+        case VclEventId::DropdownClose:
+        {
+            Any aOldValue;
+            aOldValue <<= AccessibleStateType::EXPANDED;
+            NotifyAccessibleEvent(AccessibleEventId::STATE_CHANGED, aOldValue, Any());
+        }
+        break;
         default:
             VCLXAccessibleTextComponent::ProcessWindowEvent( rVclWindowEvent );
    }
@@ -87,9 +102,11 @@ void VCLXAccessibleButton::FillAccessibleStateSet( sal_Int64& rStateSet )
         rStateSet |= AccessibleStateType::PRESSED;
 
     // IA2 CWS: if the button has a popup menu, it should has the state EXPANDABLE
-    if( pButton->GetType() == WindowType::MENUBUTTON )
+    if (pButton->GetType() == WindowType::MENUBUTTON)
     {
         rStateSet |= AccessibleStateType::EXPANDABLE;
+        if (GetAs<MenuButton>()->InPopupMode())
+            rStateSet |= AccessibleStateType::EXPANDED;
     }
     if( pButton->GetStyle() & WB_DEFBUTTON )
     {
@@ -169,7 +186,11 @@ sal_Bool VCLXAccessibleButton::doAccessibleAction ( sal_Int32 nIndex )
     VclPtr< PushButton > pButton = GetAs< PushButton >();
     if ( pButton )
     {
-        if (pButton->isToggleButton())
+        if (pButton->GetType() == WindowType::MENUBUTTON)
+        {
+            GetAs<MenuButton>()->ExecuteMenu();
+        }
+        else if (pButton->isToggleButton())
         {
             // PushButton::Click doesn't toggle when it's a toggle button
             pButton->Check(!pButton->IsChecked());

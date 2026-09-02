@@ -17,17 +17,17 @@
 *   the License at http://www.apache.org/licenses/LICENSE-2.0 .
 */
 
-#include <vcl/toolkit/button.hxx>
+#include <vcl/toolkit/MenuButton.hxx>
 #include "NotebookbarPopup.hxx"
 #include "PriorityHBox.hxx"
 
 class PriorityMergedHBox final : public PriorityHBox
 {
 private:
-    VclPtr<PushButton> m_pButton;
+    VclPtr<MenuButton> m_pButton;
     VclPtr<NotebookbarPopup> m_pPopup;
 
-    DECL_LINK(PBClickHdl, Button*, void);
+    DECL_LINK(PopupPrepareHdl, MenuButton*, void);
 
 public:
     explicit PriorityMergedHBox(vcl::Window* pParent);
